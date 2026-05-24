@@ -8,7 +8,7 @@ console.log("[Next] build with chunk: ", !disableChunk);
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  webpack(config) {
+  webpack(config, { isServer }) {
     config.module.rules.push({
       test: /\.svg$/,
       use: ["@svgr/webpack"],
@@ -20,9 +20,20 @@ const nextConfig = {
       );
     }
 
+    // 合并 fallback，保留原有设置并添加需要的
     config.resolve.fallback = {
+      ...config.resolve.fallback,
       child_process: false,
     };
+
+    // 客户端忽略可选原生模块
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        bufferutil: false,
+        'utf-8-validate': false,
+      };
+    }
 
     return config;
   },
@@ -64,13 +75,7 @@ if (mode !== "export") {
 
   nextConfig.rewrites = async () => {
     const ret = [
-      // adjust for previous version directly using "/api/proxy/" as proxy base route
-      // {
-      //   source: "/api/proxy/v1/:path*",
-      //   destination: "https://api.openai.com/v1/:path*",
-      // },
       {
-        // https://{resource_name}.openai.azure.com/openai/deployments/{deploy_name}/chat/completions
         source:
           "/api/proxy/azure/:resource_name/deployments/:deploy_name/:path*",
         destination:
